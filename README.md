@@ -1,4 +1,4 @@
-# Projet de Scraping - Books to Scrape
+# Projet de Scraping - Books to Scrape (session 2)
 
 ## 1) Site scrappé
 
@@ -10,11 +10,13 @@ Le scraping se fait **dans l'ordre des catégories affichées sur le site**.
 
 ## 2) But du code de scraping
 
-L'objectif est de construire un pipeline de collecte de données simple et robuste pour:
+L'objectif est de construire un pipeline de collecte de donnees robuste et automatise pour:
 
 - extraire les informations des livres,
 - produire un fichier CSV exploitable pour l'analyse,
-- démontrer une architecture claire avec séparation des responsabilités.
+- demontrer une architecture claire avec separation des responsabilites,
+- executer le pipeline sous Docker Compose et le planifier avec cron,
+- produire des logs, des metriques et des garde-fous de qualite.
 
 Les colonnes générées dans le CSV final sont:
 
@@ -49,55 +51,54 @@ Le projet applique deux choix techniques pour accélérer fortement l'exécution
 2. **Réutiliser une seule session HTTP** (`requests.Session`):
    - évite de recréer une connexion à chaque requête.
 
-### c) Gestion des erreurs
+### c) Robustesse et monitoring
 
-Le pipeline gère les erreurs sans bloquer toute l'exécution:
-
-- `try / except` sur les requêtes HTTP,
-- messages d'erreur clairs,
-- continuation du pipeline en cas d'échec ponctuel.
+- retries HTTP avec backoff et codes d'erreur classes,
+- validation des lignes et quarantaine JSONL,
+- ecriture atomique du CSV,
+- verrou contre les executions concurrentes,
+- logs rotatifs et alertes en cas d'echecs consecutifs.
 
 ## 5) Architecture du projet
 
 ```text
 project/
+├── Dockerfile
+├── docker-compose.yml
+├── crontab.sh
 ├── app/
-│   ├── scraper.py      # extraction des données du site
-│   ├── transform.py    # formatage des données et export CSV
-│   └── main.py         # orchestration du pipeline
+│   ├── scraper.py      # extraction resiliente et metriques
+│   ├── transform.py    # validation et export CSV atomique
+│   ├── main.py         # orchestration et garde-fous
+│   ├── alerting.py     # notifications d'echecs consecutifs
+│   ├── error_codes.py  # classification des erreurs
+│   ├── logging_config.py
+│   ├── runtime_lock.py
+│   └── requirements.txt
 ├── data/
-│   └── books.csv       # sortie finale
-├── docs/
-│   └── pipeline_schema.pdf
+│   └── books.csv       # sortie finale persistee
 └── README.md
 ```
 
-## 6) Schéma du pipeline (PDF)
-
-Le schéma est disponible ici:
-
-- `docs/pipeline_schema.pdf`
-
-## 7) Installation
-
-```bash
-pip install requests beautifulsoup4
-```
-
-## 8) Lancement
+## 6) Lancement
 
 Depuis le dossier `project`:
 
 ```bash
-python3 app/main.py
+docker compose up -d --build
+docker compose exec -T python-app /usr/bin/python3 /app/main.py
+docker compose exec -T python-app sh -lc "tail -n 40 /data/pipeline.log"
+docker compose down
 ```
 
-Sortie:
+Sorties:
 
 - `data/books.csv`
+- `data/pipeline.log`
+- `data/rejected_rows.jsonl` en cas de ligne rejetee
 
-## 9) Notes importantes
+## 7) Notes importantes
 
 - Le scraping respecte l'ordre des catégories du site.
 - Les notes sont formatées en notation sur 5 avec une décimale (ex: `4,0/5`).
-- Le CSV produit est prêt pour une analyse (Excel, pandas, BI).
+- Le volume Docker `./data:/data` conserve les sorties sur l'hote.
