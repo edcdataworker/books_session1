@@ -1,5 +1,4 @@
-# Projet de Scraping - Books to Scrape (session 2)
-
+# Projet de Scraping - Books to Scrape 
 ## 1) Site scrappé
 
 Ce projet scrape le site public d'entraînement:
